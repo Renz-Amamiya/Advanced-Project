@@ -2,28 +2,30 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\MasterTutorial;
 use Illuminate\Http\Request;
+use App\Models\MasterTutorial;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Support\Str;
 
 class MasterTutorialController extends Controller
 {
     public function index()
     {
-        // 1. Ambil data dari database lokal
-        $tutorials = MasterTutorial::latest()->get();
+        $tutorials = MasterTutorial::all();
+        $makuls = []; // Wadah default kosong
 
-        // 2. Ambil token dari session
-        $token = Session::get('token');
+        // 1. Ambil Token dari Session
+        $token = Session::get('token') ?? Session::get('refreshToken') ?? Session::get('access_token'); 
 
-        // 3. Hit API untuk ambil Mata Kuliah
-        $response = Http::withToken($token)->get('https://jwt-auth-eight-neon.vercel.app/getMakul');
-        
-        $makuls = [];
-        if ($response->successful()) {
-            $makuls = $response->json('data'); // Ambil array data-nya
+        // 2. Jika token ada, tembak API Vercel
+        if ($token) {
+            $response = Http::withToken($token)->get('https://jwt-auth-eight-neon.vercel.app/getMakul');
+
+            if ($response->successful()) {
+                $hasilApi = $response->json();
+                // Deteksi otomatis apakah data dibungkus 'data' atau langsung array
+                $makuls = isset($hasilApi['data']) ? $hasilApi['data'] : $hasilApi;
+            }
         }
 
         return view('master.index', compact('tutorials', 'makuls'));
@@ -33,28 +35,27 @@ class MasterTutorialController extends Controller
     {
         $request->validate([
             'judul' => 'required',
-            'kode_mk' => 'required',
+            'kode_mk' => 'required'
         ]);
 
-        // Generate URL Unique pakai Str::slug dan timestamp biar unik
-        $slug = Str::slug($request->judul);
-        $uniqueId = time();
+        $slug = \Str::slug($request->judul);
+        $uniqueTs = time();
 
         MasterTutorial::create([
             'judul' => $request->judul,
             'kode_mk' => $request->kode_mk,
-            'url_presentation' => "presentation/{$slug}-{$uniqueId}",
-            'url_finished' => "finished/{$slug}-{$uniqueId}",
-            'creator_email' => Session::get('user_email'), // Otomatis dari email login
+            'creator_email' => Session::get('user_email') ?? 'admin@mail.com',
+            'url_presentation' => 'presentation/' . $slug . '-' . $uniqueTs,
+            'url_finished' => 'finished/' . $slug . '-' . ($uniqueTs + random_int(100, 999)),
         ]);
 
-        return redirect()->route('master.index')->with('success', 'Master Tutorial berhasil ditambahkan!');
+        return redirect()->route('master.index')->with('success', 'MISSION LOG: Tutorial Baru Berhasil Dibuat!');
     }
 
-    // Fungsi destroy untuk Hapus data
     public function destroy($id)
     {
-        MasterTutorial::findOrFail($id)->delete();
-        return redirect()->route('master.index')->with('success', 'Tutorial berhasil dihapus!');
+        $tutorial = MasterTutorial::findOrFail($id);
+        $tutorial->delete();
+        return redirect()->route('master.index')->with('success', 'TARGET ELIMINATED: Tutorial berhasil dihapus!');
     }
 }

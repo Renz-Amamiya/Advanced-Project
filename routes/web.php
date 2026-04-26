@@ -20,8 +20,6 @@ Route::delete('/detail-tutorial/{id}', [DetailTutorialController::class, 'destro
 // Rute Public (Mahasiswa / Tanpa Login)
 Route::get('/presentation/{slug}', [PublicTutorialController::class, 'presentation']);
 Route::get('/finished/{slug}', [PublicTutorialController::class, 'finished']);
-// Rute API untuk SiAdin
-Route::get('/api/{kode_mk}', [PublicTutorialController::class, 'apiMakul']);
 
 // Rute yang butuh autentikasi (harus login)
 Route::middleware([\App\Http\Middleware\CekTokenApi::class])->group(function () {

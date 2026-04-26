@@ -2,53 +2,50 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\Request;
 use App\Models\MasterTutorial;
 use App\Models\DetailTutorial;
-use Illuminate\Http\Request;
-use Barryvdh\DomPDF\Facade\Pdf;
 
 class PublicTutorialController extends Controller
 {
-    // 1. Halaman Presentation (Hanya status "show")
+    // Halaman Presentation (HANYA status 'Show' & Auto-Refresh)
     public function presentation($slug)
     {
-        $fullUrl = 'presentation/' . $slug;
-        $master = MasterTutorial::where('url_presentation', $fullUrl)->firstOrFail();
+        // Cari master berdasarkan slug di URL
+        $master = MasterTutorial::where('url_presentation', 'LIKE', '%' . $slug . '%')->firstOrFail();
         
-        // Ambil detail yang statusnya HANYA show
+        // Ambil detail yang HANYA berstatus SHOW
         $details = DetailTutorial::where('master_tutorial_id', $master->id)
-                                 ->where('status', 'show')
-                                 ->orderBy('order', 'asc')
-                                 ->get();
+                    ->where('status', 'show')
+                    ->orderBy('order', 'asc')
+                    ->get();
 
-        return view('public.presentation', compact('master', 'details'));
+        // Cek apakah ada detail yang masih berstatus 'hide'
+        $hasHidden = DetailTutorial::where('master_tutorial_id', $master->id)
+                    ->where('status', 'hide')
+                    ->exists();
+        
+        // Cek apakah sudah ada materi sama sekali
+        $hasDetails = DetailTutorial::where('master_tutorial_id', $master->id)->exists();
+
+        // Tombol finish hanya aktif jika sudah ada materi dan TIDAK ADA yang di-hide
+        $canFinish = $hasDetails && !$hasHidden;
+
+        return view('public.presentation', compact('master', 'details', 'canFinish'));
     }
 
-    // 2. Halaman Finished / PDF (Semua status tampil)
+    // Halaman Full PDF (Semua status 'Show' & 'Hide' tampil)
     public function finished($slug)
     {
-        $fullUrl = 'finished/' . $slug;
-        $master = MasterTutorial::where('url_finished', $fullUrl)->firstOrFail();
+        $master = MasterTutorial::where('url_finished', 'LIKE', '%' . $slug . '%')->firstOrFail();
         
-        // Ambil SEMUA detail tanpa melihat status show/hide
+        // Ambil SEMUA detail tanpa filter status
         $details = DetailTutorial::where('master_tutorial_id', $master->id)
-                                 ->orderBy('order', 'asc')
-                                 ->get();
+                    ->orderBy('order', 'asc')
+                    ->get();
 
-        // Load view dan jadikan PDF
-        $pdf = Pdf::loadView('public.pdf', compact('master', 'details'));
-        
-        // Gunakan stream() agar tampil di browser (seperti contoh di soal)
-        return $pdf->stream('Tutorial-' . $master->judul . '.pdf');
+        return view('public.pdf', compact('master', 'details'));
     }
 
-    // 3. API Server untuk list tutorial per mata kuliah
-    public function apiMakul($kode_mk)
-    {
-        $tutorials = MasterTutorial::where('kode_mk', $kode_mk)
-                        ->select('judul', 'url_presentation', 'url_finished', 'creator_email', 'created_at', 'updated_at')
-                        ->get();
 
-        return response()->json($tutorials);
-    }
 }

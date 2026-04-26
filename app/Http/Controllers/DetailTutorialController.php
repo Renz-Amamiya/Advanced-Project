@@ -2,69 +2,64 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\Request;
 use App\Models\MasterTutorial;
 use App\Models\DetailTutorial;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class DetailTutorialController extends Controller
 {
     public function index($id)
     {
-        $master = MasterTutorial::findOrFail($id);
-        // Ambil detail diurutkan berdasarkan 'order'
-        $details = DetailTutorial::where('master_tutorial_id', $id)->orderBy('order', 'asc')->get();
-        
+        $master = MasterTutorial::findOrFail($id); // atau nama variable sesuai kebutuhan
+        $details = DetailTutorial::where('master_tutorial_id', $id)->get();
+    
         return view('detail.index', compact('master', 'details'));
     }
 
     public function store(Request $request, $id)
     {
         $request->validate([
-            'order' => 'required|integer',
-            'status' => 'required|in:show,hide',
-            'gambar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
+            'order' => 'required|numeric',
+            'text' => 'nullable|string',
+            'code' => 'nullable|string',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'url' => 'nullable|url'
         ]);
 
-        $gambarPath = null;
-        if ($request->hasFile('gambar')) {
-            // Simpan gambar ke folder storage/app/public/tutorial_images
-            $gambarPath = $request->file('gambar')->store('tutorial_images', 'public');
+        $data = $request->all();
+        $data['master_tutorial_id'] = $id;
+        $data['status'] = 'show'; // Default langsung Show
+
+        // Proses Upload Gambar
+        if ($request->hasFile('image')) {
+            $data['image'] = $request->file('image')->store('tutorial-images', 'public');
         }
 
-        DetailTutorial::create([
-            'master_tutorial_id' => $id,
-            'text' => $request->text,
-            'gambar' => $gambarPath,
-            'code' => $request->code,
-            'url' => $request->url,
-            'order' => $request->order,
-            'status' => $request->status,
-        ]);
+        DetailTutorial::create($data);
 
-        return back()->with('success', 'Detail tutorial berhasil ditambahkan!');
+        return redirect()->back()->with('success', 'MISSION LOG UPDATED: Langkah baru berhasil ditambahkan!');
     }
 
     public function updateStatus(Request $request, $id)
     {
         $detail = DetailTutorial::findOrFail($id);
-        $detail->update([
-            'status' => $request->status
-        ]);
+        $detail->update(['status' => $request->status]);
 
-        return back()->with('success', 'Status berhasil diperbarui!');
+        return redirect()->back()->with('success', 'STATUS OVERRIDDEN: Visibilitas langkah diubah!');
     }
 
     public function destroy($id)
     {
         $detail = DetailTutorial::findOrFail($id);
         
-        // Hapus file gambar jika ada
-        if ($detail->gambar) {
-            Storage::disk('public')->delete($detail->gambar);
+        // Hapus file gambar dari folder jika ada
+        if ($detail->image) {
+            Storage::disk('public')->delete($detail->image);
         }
         
         $detail->delete();
-        return back()->with('success', 'Detail tutorial berhasil dihapus!');
+
+        return redirect()->back()->with('success', 'TARGET ELIMINATED: Langkah berhasil dihapus!');
     }
 }
